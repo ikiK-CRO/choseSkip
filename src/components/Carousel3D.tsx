@@ -58,6 +58,10 @@ const SkipPlane: React.FC<SkipPlaneProps> = ({ skip, index, totalSkips, selected
   );
 };
 
+interface CarouselHandle {
+  setSelectedIndex: (index: number) => void;
+}
+
 interface CarouselProps {
   skips: Skip[];
   groupRef: React.RefObject<THREE.Group>;
@@ -66,78 +70,89 @@ interface CarouselProps {
   onSelect?: (skipId: string | null) => void;
 }
 
-const Carousel: React.FC<CarouselProps> = ({ skips, groupRef, text3d, lastSelectedIndexRef, onSelect }) => {
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const totalSkips = skips.length;
-  // Update parent and ref when selectedIndex changes
-  React.useEffect(() => {
-    if (lastSelectedIndexRef) lastSelectedIndexRef.current = selectedIndex;
-    if (onSelect) onSelect(skips[selectedIndex]?.id ?? null);
-  }, [selectedIndex, skips, lastSelectedIndexRef, onSelect]);
+const Carousel = React.forwardRef<CarouselHandle, CarouselProps>(
+  ({ skips, groupRef, text3d, lastSelectedIndexRef, onSelect }, ref) => {
+    const totalSkips = skips.length;
+    const [rotation, setRotation] = useState(0); // Y rotation in radians (not including extra tilt)
+    // Compute the selected index based on the current rotation and extra tilt
+    const selectedIndex = ((-Math.round(((rotation + WHEEL_Y_EXTRA_TILT) / (2 * Math.PI)) * totalSkips) % totalSkips) + totalSkips) % totalSkips;
 
-  // Calculate the rotation so selectedIndex is always at the front
-  const baseRotation = -selectedIndex * (2 * Math.PI / totalSkips) + WHEEL_Y_EXTRA_TILT;
+    React.useEffect(() => {
+      if (lastSelectedIndexRef) lastSelectedIndexRef.current = selectedIndex;
+      if (onSelect) onSelect(skips[selectedIndex]?.id ?? null);
+    }, [selectedIndex, skips, lastSelectedIndexRef, onSelect]);
 
-  // Drag logic
-  const [isDragging, setIsDragging] = useState(false);
-  const [previousMouseX, setPreviousMouseX] = useState(0);
+    // Drag logic
+    const [isDragging, setIsDragging] = useState(false);
+    const [previousMouseX, setPreviousMouseX] = useState(0);
 
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-    setIsDragging(true);
-    setPreviousMouseX(e.clientX);
-  };
+    const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+      setIsDragging(true);
+      setPreviousMouseX(e.clientX);
+    };
 
-  const handlePointerUp = () => {
-    setIsDragging(false);
-  };
-
-  const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
-    if (!isDragging) return;
-    const deltaX = e.clientX - previousMouseX;
-    if (Math.abs(deltaX) > 10) {
-      if (deltaX > 0) {
-        setSelectedIndex((prev) => (prev - 1 + totalSkips) % totalSkips);
-      } else {
-        setSelectedIndex((prev) => (prev + 1) % totalSkips);
-      }
+    const handlePointerUp = () => {
       setIsDragging(false);
-    }
-    setPreviousMouseX(e.clientX);
-  };
+    };
 
-  return (
-    <group
-      ref={groupRef}
-      position={[WHEEL_X_OFFSET, 0, 0]}
-      rotation={[TILT_X, baseRotation, 0]}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerMove={handlePointerMove}
-      onPointerOut={handlePointerUp}
-    >
-      {skips.map((skip, index) => (
-        <SkipPlane
-          key={skip.id}
-          skip={skip}
-          index={index}
-          totalSkips={skips.length}
-          selected={index === selectedIndex}
-          text3d={text3d}
-        />
-      ))}
-    </group>
-  );
-};
+    const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
+      if (!isDragging) return;
+      const deltaX = e.clientX - previousMouseX;
+      if (Math.abs(deltaX) > 10) {
+        const step = deltaX > 0 ? -1 : 1;
+        setRotation((prev) => prev + step * (2 * Math.PI / totalSkips));
+        setIsDragging(false);
+      }
+      setPreviousMouseX(e.clientX);
+    };
+
+    React.useImperativeHandle(ref, () => ({
+      setSelectedIndex: (index: number) => {
+        setRotation(-index * (2 * Math.PI / totalSkips));
+      },
+    }));
+
+    return (
+      <group
+        ref={groupRef}
+        position={[WHEEL_X_OFFSET, 0, 0]}
+        rotation={[TILT_X, rotation + WHEEL_Y_EXTRA_TILT, 0]}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerMove={handlePointerMove}
+        onPointerOut={handlePointerUp}
+      >
+        {skips.map((skip, index) => (
+          <SkipPlane
+            key={skip.id}
+            skip={skip}
+            index={index}
+            totalSkips={skips.length}
+            selected={index === selectedIndex}
+            text3d={text3d}
+          />
+        ))}
+      </group>
+    );
+  }
+);
 
 const Carousel3D = forwardRef<Carousel3DRef, Carousel3DProps>(({ skips, text3d, onSelect }, ref) => {
   const lastSelectedIndexRef = React.useRef<number>(0);
   const groupRef = useRef<THREE.Group>(null!);
+  const carouselHandle = useRef<CarouselHandle>(null);
 
   useImperativeHandle(ref, () => ({
     rotateBy: (radians: number) => {
-      if (groupRef.current) {
-        groupRef.current.rotation.y += radians;
-      }
+      if (!skips.length) return;
+      // Find the current selected index
+      const current = lastSelectedIndexRef.current ?? 0;
+      const total = skips.length;
+      // Calculate how many steps to rotate
+      const step = Math.round(radians / (2 * Math.PI / total));
+      const next = (current + step + total) % total;
+      // Use the Carousel's setSelectedIndex
+      carouselHandle.current?.setSelectedIndex(next);
     },
   }));
 
@@ -146,7 +161,14 @@ const Carousel3D = forwardRef<Carousel3DRef, Carousel3DProps>(({ skips, text3d, 
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
       {/* Render the spinning wheel without the selected item */}
-      <Carousel skips={skips} groupRef={groupRef} text3d={text3d} lastSelectedIndexRef={lastSelectedIndexRef} onSelect={onSelect} />
+      <Carousel
+        ref={carouselHandle}
+        skips={skips}
+        groupRef={groupRef}
+        text3d={text3d}
+        lastSelectedIndexRef={lastSelectedIndexRef}
+        onSelect={onSelect}
+      />
     </Canvas>
   );
 });
