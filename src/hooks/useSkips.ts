@@ -33,7 +33,7 @@ export const useSkips = (postcode: string, area: string) => {
         size: `${item.size} Yard`,
         price: item.price_before_vat,
         roadLegal: item.allowed_on_road,
-        imageUrl: `https://wewantwaste.co.uk/wp-content/uploads/2025/11/${item.size}-yard-skip-hire.png`,
+        imageUrl: `https://wewantwaste.co.uk/wp-content/uploads/2022/11/${item.size}-yard-skip-hire.png`,
       }));
     },
   });

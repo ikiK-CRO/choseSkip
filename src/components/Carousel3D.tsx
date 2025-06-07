@@ -1,8 +1,12 @@
-import React, { useRef, useState, useMemo, useEffect } from 'react';
+import React, { useRef, useState, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Plane, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Skip } from '../hooks/useSkips';
+
+export interface Carousel3DRef {
+  rotateBy: (radians: number) => void;
+}
 
 interface Carousel3DProps {
   skips: Skip[];
@@ -16,10 +20,9 @@ interface SkipPlaneProps {
   index: number;
   totalSkips: number;
   selected: boolean;
-  onSelect: (skipId: string) => void;
 }
 
-const SkipPlane: React.FC<SkipPlaneProps> = ({ skip, index, totalSkips, selected, onSelect }) => {
+const SkipPlane: React.FC<SkipPlaneProps> = ({ skip, index, totalSkips, selected }) => {
   const angle = (index / totalSkips) * Math.PI * 2;
   const x = CYLINDER_RADIUS * Math.cos(angle);
   const z = CYLINDER_RADIUS * Math.sin(angle);
@@ -29,7 +32,7 @@ const SkipPlane: React.FC<SkipPlaneProps> = ({ skip, index, totalSkips, selected
 
   return (
     <group position={[x, 0, z]} rotation={[0, rotationY, 0]}>
-      <Plane args={[2, 2]} onClick={() => onSelect(skip.id)}>
+      <Plane args={[2, 2]}>
         <meshStandardMaterial map={texture} side={THREE.DoubleSide} transparent opacity={selected ? 1 : 0.7} />
       </Plane>
       <Text position={[0, -1.2, 0.1]} fontSize={0.3} color="white">
@@ -42,11 +45,10 @@ const SkipPlane: React.FC<SkipPlaneProps> = ({ skip, index, totalSkips, selected
 interface CarouselProps {
   skips: Skip[];
   onSelect: (skipId: string | null) => void;
-  setSelectedSkip: React.Dispatch<React.SetStateAction<string | null>>;
+  groupRef: React.RefObject<THREE.Group>;
 }
 
-const Carousel: React.FC<CarouselProps> = ({ skips, onSelect, setSelectedSkip }) => {
-  const groupRef = useRef<THREE.Group>(null!);
+const Carousel: React.FC<CarouselProps> = ({ skips, onSelect, groupRef }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [previousMouseX, setPreviousMouseX] = useState(0);
   const lastSelectedIndexRef = useRef<number | null>(null);
@@ -63,13 +65,12 @@ const Carousel: React.FC<CarouselProps> = ({ skips, onSelect, setSelectedSkip })
   const handlePointerMove = (e: React.PointerEvent<Element>) => {
     if (!isDragging || !groupRef.current) return;
     const deltaX = e.clientX - previousMouseX;
-    groupRef.current.rotation.y += deltaX * 0.01;
+    groupRef.current.rotation.y += deltaX * 0.005; // Reduced sensitivity
     setPreviousMouseX(e.clientX);
   };
-  
+
   useFrame(() => {
     if (!groupRef.current || skips.length === 0) return;
-
     const rotationY = groupRef.current.rotation.y;
     const totalSkips = skips.length;
     
@@ -88,12 +89,11 @@ const Carousel: React.FC<CarouselProps> = ({ skips, onSelect, setSelectedSkip })
         selectedIndex = index;
       }
     });
-    
+
     if (lastSelectedIndexRef.current !== selectedIndex) {
       lastSelectedIndexRef.current = selectedIndex;
       const selected = skips[selectedIndex];
       if (selected) {
-        setSelectedSkip(selected.id);
         onSelect(selected.id);
       }
     }
@@ -105,7 +105,7 @@ const Carousel: React.FC<CarouselProps> = ({ skips, onSelect, setSelectedSkip })
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerMove={handlePointerMove}
-      onPointerOut={handlePointerUp} 
+      onPointerOut={handlePointerUp}
     >
       {skips.map((skip, index) => (
         <SkipPlane
@@ -113,7 +113,6 @@ const Carousel: React.FC<CarouselProps> = ({ skips, onSelect, setSelectedSkip })
           skip={skip}
           index={index}
           totalSkips={skips.length}
-          onSelect={() => onSelect(skip.id)}
           selected={lastSelectedIndexRef.current === index}
         />
       ))}
@@ -121,23 +120,24 @@ const Carousel: React.FC<CarouselProps> = ({ skips, onSelect, setSelectedSkip })
   );
 };
 
-const Carousel3D: React.FC<Carousel3DProps> = ({ skips, onSelect }) => {
-  const [selectedSkip, setSelectedSkip] = useState<string | null>(null);
+const Carousel3D = forwardRef<Carousel3DRef, Carousel3DProps>(({ skips, onSelect }, ref) => {
+  const groupRef = useRef<THREE.Group>(null!);
 
-  useEffect(() => {
-    if(skips.length > 0 && !selectedSkip) {
-      onSelect(skips[0].id)
-      setSelectedSkip(skips[0].id)
-    }
-  }, [skips, selectedSkip, onSelect]);
+  useImperativeHandle(ref, () => ({
+    rotateBy: (radians: number) => {
+      if (groupRef.current) {
+        groupRef.current.rotation.y += radians;
+      }
+    },
+  }));
 
   return (
     <Canvas camera={{ position: [0, 0, 8], fov: 50 }}>
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
-      <Carousel skips={skips} onSelect={onSelect} setSelectedSkip={setSelectedSkip} />
+      <Carousel skips={skips} onSelect={onSelect} groupRef={groupRef} />
     </Canvas>
   );
-};
+});
 
 export default Carousel3D;
