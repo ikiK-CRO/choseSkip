@@ -1,12 +1,15 @@
 import React from 'react';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 
 interface MapBackgroundProps {
-  postcode: string;
   children: React.ReactNode;
 }
 
-const MapBackground: React.FC<MapBackgroundProps> = ({ postcode, children }) => {
+const LOWESTOFT_STREET = { lat: 52.4751, lng: 1.7516 }; // Use the same Lowestoft location
+
+const MapBackground: React.FC<MapBackgroundProps> = ({ children }) => {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const { isLoaded } = useJsApiLoader({ googleMapsApiKey: apiKey || '' });
 
   if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
     return (
@@ -19,14 +22,20 @@ const MapBackground: React.FC<MapBackgroundProps> = ({ postcode, children }) => 
     );
   }
 
-  const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${postcode}&zoom=17&size=600x400&key=${apiKey}`;
-
   return (
-    <div
-      className="relative w-full bg-cover bg-center h-64 md:h-96"
-      style={{ backgroundImage: `url(${mapUrl})` }}
-    >
-      <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div className="relative w-screen h-screen md:w-full md:h-64 md:h-96 lg:h-full">
+      {isLoaded && (
+        <GoogleMap
+          mapContainerStyle={{ width: '100%', height: '100%' }}
+          center={LOWESTOFT_STREET}
+          zoom={20}
+          options={{ disableDefaultUI: true, gestureHandling: 'none', draggable: false }}
+        >
+          <Marker position={LOWESTOFT_STREET} />
+        </GoogleMap>
+      )}
+      {/* Lighter, more transparent overlay for better street name visibility */}
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-10">
         {children}
       </div>
     </div>
