@@ -9,7 +9,14 @@ export interface Skip {
   roadLegal: boolean;
 }
 
-const fetchSkips = async (postcode: string, area: string): Promise<{skips: Skip[]}> => {
+interface ApiSkip {
+  id: number;
+  size: number;
+  price_before_vat: number;
+  allowed_on_road: boolean;
+}
+
+const fetchSkips = async (postcode: string, area: string): Promise<ApiSkip[]> => {
   const { data } = await axios.get(
     `https://app.wewantwaste.co.uk/api/skips/by-location?postcode=${postcode}&area=${area}`
   );
@@ -20,6 +27,14 @@ export const useSkips = (postcode: string, area: string) => {
   return useQuery({
     queryKey: ['skips', postcode, area],
     queryFn: () => fetchSkips(postcode, area),
-    select: (data) => data.skips,
+    select: (data: ApiSkip[]): Skip[] => {
+      return data.map((item) => ({
+        id: item.id.toString(),
+        size: `${item.size} Yard`,
+        price: item.price_before_vat,
+        roadLegal: item.allowed_on_road,
+        imageUrl: `https://wewantwaste.co.uk/wp-content/uploads/2025/11/${item.size}-yard-skip-hire.png`,
+      }));
+    },
   });
 };
