@@ -72,15 +72,35 @@ interface CarouselProps {
 
 const Carousel = React.forwardRef<CarouselHandle, CarouselProps>(
   ({ skips, groupRef, text3d, lastSelectedIndexRef, onSelect }, ref) => {
+    const [selectedIndex, setSelectedIndex] = useState(0);
+    React.useEffect(() => { setSelectedIndex(0); }, [skips.length]);
     const totalSkips = skips.length;
-    const [rotation, setRotation] = useState(0); // Y rotation in radians (not including extra tilt)
-    // Compute the selected index based on the current rotation and extra tilt
-    const selectedIndex = ((-Math.round(((rotation + WHEEL_Y_EXTRA_TILT) / (2 * Math.PI)) * totalSkips) % totalSkips) + totalSkips) % totalSkips;
+    const rotation = -selectedIndex * (2 * Math.PI / (totalSkips || 1)) + WHEEL_Y_EXTRA_TILT;
+
+    // Find the true front item by projecting all items and finding the one with the highest Z
+    let maxZ = -Infinity;
+    let frontIndex = 0;
+    for (let i = 0; i < totalSkips; i++) {
+      const angle = (i / totalSkips) * Math.PI * 2;
+      // Position before group transform
+      const pos = new THREE.Vector3(
+        CYLINDER_RADIUS * Math.cos(angle),
+        0,
+        CYLINDER_RADIUS * Math.sin(angle)
+      );
+      // Apply group rotation (tilt and y-rotation)
+      pos.applyAxisAngle(new THREE.Vector3(1, 0, 0), TILT_X);
+      pos.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotation);
+      if (pos.z > maxZ) {
+        maxZ = pos.z;
+        frontIndex = i;
+      }
+    }
 
     React.useEffect(() => {
-      if (lastSelectedIndexRef) lastSelectedIndexRef.current = selectedIndex;
-      if (onSelect) onSelect(skips[selectedIndex]?.id ?? null);
-    }, [selectedIndex, skips, lastSelectedIndexRef, onSelect]);
+      if (lastSelectedIndexRef) lastSelectedIndexRef.current = frontIndex;
+      if (onSelect) onSelect(skips[frontIndex]?.id ?? null);
+    }, [frontIndex, skips, lastSelectedIndexRef, onSelect]);
 
     // Drag logic
     const [isDragging, setIsDragging] = useState(false);
@@ -96,11 +116,11 @@ const Carousel = React.forwardRef<CarouselHandle, CarouselProps>(
     };
 
     const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
-      if (!isDragging) return;
+      if (!isDragging || skips.length < 2) return;
       const deltaX = e.clientX - previousMouseX;
       if (Math.abs(deltaX) > 10) {
         const step = deltaX > 0 ? -1 : 1;
-        setRotation((prev) => prev + step * (2 * Math.PI / totalSkips));
+        setSelectedIndex((prev) => (prev + step + skips.length) % skips.length);
         setIsDragging(false);
       }
       setPreviousMouseX(e.clientX);
@@ -108,7 +128,10 @@ const Carousel = React.forwardRef<CarouselHandle, CarouselProps>(
 
     React.useImperativeHandle(ref, () => ({
       setSelectedIndex: (index: number) => {
-        setRotation(-index * (2 * Math.PI / totalSkips));
+        setSelectedIndex((prev) => {
+          const newIndex = (prev + index + skips.length) % skips.length;
+          return newIndex;
+        });
       },
     }));
 
@@ -116,7 +139,7 @@ const Carousel = React.forwardRef<CarouselHandle, CarouselProps>(
       <group
         ref={groupRef}
         position={[WHEEL_X_OFFSET, 0, 0]}
-        rotation={[TILT_X, rotation + WHEEL_Y_EXTRA_TILT, 0]}
+        rotation={[TILT_X, rotation, 0]}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerMove={handlePointerMove}
@@ -128,7 +151,7 @@ const Carousel = React.forwardRef<CarouselHandle, CarouselProps>(
             skip={skip}
             index={index}
             totalSkips={skips.length}
-            selected={index === selectedIndex}
+            selected={index === frontIndex}
             text3d={text3d}
           />
         ))}
@@ -145,14 +168,7 @@ const Carousel3D = forwardRef<Carousel3DRef, Carousel3DProps>(({ skips, text3d, 
   useImperativeHandle(ref, () => ({
     rotateBy: (radians: number) => {
       if (!skips.length) return;
-      // Find the current selected index
-      const current = lastSelectedIndexRef.current ?? 0;
-      const total = skips.length;
-      // Calculate how many steps to rotate
-      const step = Math.round(radians / (2 * Math.PI / total));
-      const next = (current + step + total) % total;
-      // Use the Carousel's setSelectedIndex
-      carouselHandle.current?.setSelectedIndex(next);
+      carouselHandle.current?.setSelectedIndex(Math.sign(radians));
     },
   }));
 
@@ -160,7 +176,6 @@ const Carousel3D = forwardRef<Carousel3DRef, Carousel3DProps>(({ skips, text3d, 
     <Canvas camera={{ position: [0, 0, 16], fov: 50 }} style={{ background: 'transparent' }}>
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
-      {/* Render the spinning wheel without the selected item */}
       <Carousel
         ref={carouselHandle}
         skips={skips}

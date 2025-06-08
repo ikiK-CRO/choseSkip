@@ -25,10 +25,8 @@ const ChooseSkip = () => {
   const { data: skips, isLoading, error } = useSkips('NR32', 'Lowestoft');
   const carouselRef = useRef<Carousel3DRef>(null);
 
-  const rotateAmount = Math.PI * 2 / (skips?.length || 1);
-
   const handleRotate = (direction: 'left' | 'right') => {
-    carouselRef.current?.rotateBy(direction === 'left' ? -rotateAmount : rotateAmount);
+    carouselRef.current?.rotateBy(direction === 'left' ? -1 : 1);
   };
 
   useEffect(() => {
@@ -38,7 +36,7 @@ const ChooseSkip = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [rotateAmount]);
+  }, []);
 
   const handleSelectSkip = (skipId: string | null) => {
     setSelectedSkipId(skipId);

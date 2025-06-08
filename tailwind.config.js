@@ -1,4 +1,5 @@
-const plugin = require('tailwindcss/plugin')
+import plugin from 'tailwindcss/plugin'
+import forms from '@tailwindcss/forms'
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -10,7 +11,7 @@ export default {
     extend: {},
   },
   plugins: [
-    require('@tailwindcss/forms'),
+    forms,
     plugin(function({ addComponents }) {
       addComponents({
         '.btn': {
