@@ -1,5 +1,5 @@
 import React, { useRef, useState, forwardRef, useImperativeHandle } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useLoader } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -34,10 +34,20 @@ const SkipPlane: React.FC<SkipPlaneProps> = ({ skip, index, totalSkips, selected
   const z = CYLINDER_RADIUS * Math.sin(angle);
   const rotationY = -angle + Math.PI / 2;
 
+  // Load the texture
+  const texture = useLoader(THREE.TextureLoader, skip.imageUrl);
+
   return (
     <group position={[x, 0, z]} rotation={[0, rotationY, 0]}>
+      {/* Skip Image */}
+      <mesh position={[0, 0, 0.05]}>
+        <planeGeometry args={[3, 3]} />
+        <meshBasicMaterial map={texture} transparent opacity={0.9} />
+      </mesh>
+      
+      {/* Skip Size Text */}
       <Text
-        position={[0, 0, 0.1]}
+        position={[0, -2, 0.1]}
         fontSize={0.9}
         color={text3d ? 'black' : selected ? '#fff' : '#ccc'}
         anchorX="center"
@@ -48,9 +58,11 @@ const SkipPlane: React.FC<SkipPlaneProps> = ({ skip, index, totalSkips, selected
       >
         {skip.size}
       </Text>
+      
+      {/* Selection Highlight */}
       {selected && (
         <mesh position={[0, 0, 0.11]}>
-          <planeGeometry args={[4.3, 1.2]} />
+          <planeGeometry args={[4.3, 5.2]} />
           <meshBasicMaterial color="#3b82f6" transparent opacity={0.18} />
         </mesh>
       )}
