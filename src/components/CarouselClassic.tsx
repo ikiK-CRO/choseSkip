@@ -10,6 +10,7 @@ interface CarouselClassicProps {
   onSelect?: (skipId: string | null) => void;
 }
 
+// Helper to extract the numeric yard size from the skip size string
 function getYardValue(size: string) {
   const match = size.match(/(\d+)/);
   return match ? parseInt(match[1], 10) : 0;
@@ -27,9 +28,9 @@ const useIsMobile = () => {
 };
 
 const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ skips, onSelect }, ref) => {
-  const isMobile = useIsMobile();
-  const [selectedIndex, setSelectedIndex] = useState(() => Math.floor(skips.length / 2));
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   useImperativeHandle(ref, () => ({
     goTo: (index: number) => {
@@ -41,6 +42,7 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
     if (onSelect) onSelect(skips[selectedIndex]?.id ?? null);
   }, [selectedIndex, skips, onSelect]);
 
+  // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') prev();
@@ -65,31 +67,28 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
     dragging = false;
   };
 
-  const prev = () => setSelectedIndex(i => Math.max(0, i - 1));
-  const next = () => setSelectedIndex(i => Math.min(skips.length - 1, i + 1));
+  const prev = () => setSelectedIndex(i => (i - 1 + skips.length) % skips.length);
+  const next = () => setSelectedIndex(i => (i + 1) % skips.length);
 
-  // Show 3 on mobile, 5 on desktop, always center selected, pad with empty slots
-  const getDisplaySlots = () => {
+  // Show 3 on mobile, 5 on desktop
+  const getIndices = () => {
     const count = isMobile ? 3 : 5;
+    const indices = [];
     const offset = Math.floor(count / 2);
-    const slots = [];
     for (let i = -offset; i <= offset; i++) {
-      const idx = selectedIndex + i;
-      if (idx < 0 || idx >= skips.length) {
-        slots.push(null); // placeholder
-      } else {
-        slots.push(idx);
-      }
+      indices.push((selectedIndex + i + skips.length) % skips.length);
     }
-    return slots;
+    return indices;
   };
 
   // Find min/max yard size for scaling
   const yardSizes = skips.map(s => getYardValue(s.size));
   const minYard = Math.min(...yardSizes);
   const maxYard = Math.max(...yardSizes);
+  // Helper to scale image size based on yard size
   function getImgScale(size: string, isCenter: boolean) {
     const yard = getYardValue(size);
+    // More dramatic scaling for center, less for sides
     if (isCenter) {
       return 1.2 + 1.0 * ((yard - minYard) / (maxYard - minYard || 1));
     } else {
@@ -97,27 +96,23 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
     }
   }
 
+  // Responsive card sizes
   const cardBase = isMobile ? 160 : 220;
   const cardSide = isMobile ? 90 : 140;
   const cardPadding = isMobile ? 2 : 6;
 
-  const atStart = selectedIndex === 0;
-  const atEnd = selectedIndex === skips.length - 1;
-
   return (
     <div className="w-full flex flex-col items-center">
       <div className="relative flex items-center justify-center w-full select-none" style={{ height: isMobile ? 170 : 260 }}>
-        {/* Left arrow, only show if not at start */}
-        {!atStart && (
-          <button
-            className="z-20 bg-black/60 hover:bg-blue-600 text-white rounded-full p-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 flex items-center justify-center"
-            style={{ position: 'relative', left: 0, width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, marginRight: isMobile ? 2 : 8 }}
-            onClick={prev}
-            aria-label="Previous"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          </button>
-        )}
+        {/* Left arrow, close to carousel */}
+        <button
+          className="z-20 bg-black/60 hover:bg-blue-600 text-white rounded-full p-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 flex items-center justify-center"
+          style={{ position: 'relative', left: 0, width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, marginRight: isMobile ? 2 : 8 }}
+          onClick={prev}
+          aria-label="Previous"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        </button>
         {/* Carousel items */}
         <div
           className="flex items-center justify-center w-full"
@@ -126,26 +121,12 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
           onMouseUp={handleDragEnd}
           style={{ cursor: 'grab', userSelect: 'none', maxWidth: isMobile ? 340 : 900 }}
         >
-          {getDisplaySlots().map((idx, pos) => {
-            if (idx === null) {
-              // Placeholder slot
-              return (
-                <div
-                  key={`empty-${pos}`}
-                  className="flex flex-col items-center justify-center transition-all duration-300 z-0"
-                  style={{
-                    margin: isMobile ? '0 2px' : '0 8px',
-                    width: cardSide,
-                    height: cardSide,
-                    background: 'transparent',
-                  }}
-                />
-              );
-            }
+          {getIndices().map((idx, pos, arr) => {
             const skip = skips[idx];
-            const isCenter = idx === selectedIndex;
+            const isCenter = pos === Math.floor(arr.length / 2);
             const scale = isCenter ? 1 : 0.8;
             const imgScale = getImgScale(skip.size, isCenter);
+            // Image should fill almost all of the card
             const imgMax = isCenter ? cardBase - cardPadding * 2 : cardSide - cardPadding * 2;
             const imgSize = Math.max(imgMax * 0.85, Math.min(imgMax, imgScale * imgMax));
             return (
@@ -179,17 +160,15 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
             );
           })}
         </div>
-        {/* Right arrow, only show if not at end */}
-        {!atEnd && (
-          <button
-            className="z-20 bg-black/60 hover:bg-blue-600 text-white rounded-full p-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 flex items-center justify-center"
-            style={{ position: 'relative', right: 0, width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, marginLeft: isMobile ? 2 : 8 }}
-            onClick={next}
-            aria-label="Next"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-          </button>
-        )}
+        {/* Right arrow, close to carousel */}
+        <button
+          className="z-20 bg-black/60 hover:bg-blue-600 text-white rounded-full p-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 flex items-center justify-center"
+          style={{ position: 'relative', right: 0, width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, marginLeft: isMobile ? 2 : 8 }}
+          onClick={next}
+          aria-label="Next"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </button>
       </div>
       {/* Dot indicator */}
       <div className="flex items-center justify-center mt-4 gap-2">
@@ -207,4 +186,4 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
   );
 });
 
-export default CarouselClassic;
+export default CarouselClassic; 

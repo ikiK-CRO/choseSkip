@@ -66,7 +66,7 @@ const MapBackground: React.FC<MapBackgroundProps> = ({ children, address }) => {
         )}
       </div>
       {/* Overlay is interactive */}
-      <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20" style={{ pointerEvents: 'auto' }}>
+      <div className="absolute inset-0 flex items-center justify-center z-20" style={{ pointerEvents: 'auto' }}>
         {children}
       </div>
     </div>
