@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useSkips } from '../hooks/useSkips';
 import CarouselClassic from '../components/CarouselClassic';
 import type { CarouselClassicRef } from '../components/CarouselClassic';
