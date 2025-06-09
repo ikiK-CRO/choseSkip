@@ -1,6 +1,7 @@
 # Skip Hire - Modern React Implementation
-
+git 
 **Live Demo:** [chose-skip.vercel.app](https://chose-skip.vercel.app)
+**Sandbox:** [codesandbox.io/p/github/ikiK-CRO/choseSkip/main](https://codesandbox.io/p/github/ikiK-CRO/choseSkip/main)
 
 This project is a modern redesign of the skip hire selection page, focusing on user experience, performance, and accessibility while maintaining core functionality.
 
