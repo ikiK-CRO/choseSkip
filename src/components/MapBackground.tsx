@@ -41,19 +41,19 @@ const MapBackground: React.FC<MapBackgroundProps> = ({ children, address }) => {
       {/* Map is non-interactive */}
       <div style={{ pointerEvents: 'none', width: '100%', height: '100%', position: 'absolute', inset: 0 }}>
         {isLoaded && coords && (
-          <GoogleMap
-            mapContainerStyle={{ width: '100%', height: '100%' }}
+        <GoogleMap
+          mapContainerStyle={{ width: '100%', height: '100%' }}
             center={coords}
-            zoom={20}
+          zoom={20}
             options={{
               disableDefaultUI: true,
               gestureHandling: 'none',
               draggable: false,
             }}
-          >
+        >
             <Marker position={coords} />
-          </GoogleMap>
-        )}
+        </GoogleMap>
+      )}
         {!coords && !error && (
           <div className="absolute inset-0 flex items-center justify-center z-10 text-white bg-black/40">
             Loading map…

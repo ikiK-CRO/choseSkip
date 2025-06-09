@@ -88,17 +88,29 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
   const yardSizes = skips.map(s => getYardValue(s.size));
   const minYard = Math.min(...yardSizes);
   const maxYard = Math.max(...yardSizes);
+
+  // Base sizes for cards
+  const baseCardSize = isMobile ? 160 : 220;
+  const baseSideCardSize = isMobile ? 90 : 140;
+
+  // Scale factor for cards based on yard size
+  function getCardScale(size: string) {
+    const yard = getYardValue(size);
+    // Scale between 0.8 and 1.2 based on yard size
+    return 0.8 + 0.4 * ((yard - minYard) / (maxYard - minYard || 1));
+  }
+
+  // Scale factor for images within cards
   function getImgScale(size: string, isCenter: boolean) {
     const yard = getYardValue(size);
+    // More dramatic scaling for center, less for sides
     if (isCenter) {
-      return 1.2 + 1.0 * ((yard - minYard) / (maxYard - minYard || 1));
+      return 0.9 + 0.3 * ((yard - minYard) / (maxYard - minYard || 1));
     } else {
-      return 0.5 + 0.7 * ((yard - minYard) / (maxYard - minYard || 1));
+      return 0.7 + 0.2 * ((yard - minYard) / (maxYard - minYard || 1));
     }
   }
 
-  const cardBase = isMobile ? 160 : 220;
-  const cardSide = isMobile ? 90 : 140;
   const cardPadding = isMobile ? 2 : 6;
 
   const atStart = selectedIndex === 0;
@@ -111,7 +123,7 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
         {!atStart && (
           <button
             className="z-20 bg-black/60 hover:bg-blue-600 text-white rounded-full p-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 flex items-center justify-center"
-            style={{ position: 'relative', left: isMobile ?  35 : 0, width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, marginRight: isMobile ? 2 : 8 }}
+            style={{ position: 'relative', left: isMobile ? 35 : 0, width: isMobile ? 36 : 40, height: isMobile ? 36 : 40, marginRight: isMobile ? 2 : 8 }}
             onClick={prev}
             aria-label="Previous"
           >
@@ -135,8 +147,8 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
                   className="flex flex-col items-center justify-center transition-all duration-300 z-0"
                   style={{
                     margin: isMobile ? '0 2px' : '0 8px',
-                    width: cardSide,
-                    height: cardSide,
+                    width: baseSideCardSize,
+                    height: baseSideCardSize,
                     background: 'transparent',
                   }}
                 />
@@ -144,24 +156,32 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
             }
             const skip = skips[idx];
             const isCenter = idx === selectedIndex;
-            const scale = isCenter ? 1 : 0.8;
+            const cardScale = getCardScale(skip.size);
+            const cardSize = isCenter ? baseCardSize : baseSideCardSize;
+            const scaledCardSize = cardSize * cardScale;
             const imgScale = getImgScale(skip.size, isCenter);
-            const imgMax = isCenter ? cardBase - cardPadding * 2 : cardSide - cardPadding * 2;
-            const imgSize = Math.max(imgMax * 0.85, Math.min(imgMax, imgScale * imgMax));
+            const imgMax = scaledCardSize - cardPadding * 2;
+            const imgSize = imgMax * imgScale;
+
+            // Calculate margin to maintain center alignment
+            const baseMargin = isCenter ? (isMobile ? 8 : 24) : (isMobile ? 2 : 8);
+            const sizeDiff = scaledCardSize - cardSize;
+            const adjustedMargin = baseMargin - (sizeDiff / 2);
+
             return (
               <div
                 key={skip.id}
                 className={`flex flex-col items-center justify-center transition-all duration-300 ${isCenter ? 'z-20' : 'z-10'}`}
                 style={{
-                  transform: `scale(${scale}) translateY(${isCenter ? '0px' : '20px'})`,
+                  transform: `scale(${isCenter ? 1 : 0.8}) translateY(${isCenter ? '0px' : '20px'})`,
                   opacity: isCenter ? 1 : 0.5,
-                  margin: isCenter ? (isMobile ? '0 8px' : '0 24px') : (isMobile ? '0 2px' : '0 8px'),
-                  width: isCenter ? cardBase : cardSide,
-                  height: isCenter ? cardBase : cardSide,
+                  margin: `0 ${adjustedMargin}px`,
+                  width: scaledCardSize,
+                  height: scaledCardSize,
                   boxShadow: isCenter ? '0 8px 32px rgba(0,0,0,0.18)' : 'none',
                   background: isCenter ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)',
                   borderRadius: 16,
-                  transition: 'transform 0.3s, opacity 0.3s',
+                  transition: 'transform 0.3s, opacity 0.3s, width 0.3s, height 0.3s, margin 0.3s',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -175,7 +195,12 @@ const CarouselClassic = forwardRef<CarouselClassicRef, CarouselClassicProps>(({ 
                     alt={skip.size}
                     className="object-contain"
                     draggable={false}
-                    style={{ pointerEvents: 'none', width: imgSize, height: imgSize, transition: 'width 0.3s, height 0.3s' }}
+                    style={{ 
+                      pointerEvents: 'none', 
+                      width: imgSize, 
+                      height: imgSize, 
+                      transition: 'width 0.3s, height 0.3s' 
+                    }}
                   />
                   <div 
                     className="font-semibold text-center absolute"
