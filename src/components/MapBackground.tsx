@@ -11,16 +11,44 @@ const MapBackground: React.FC<MapBackgroundProps> = ({ children, address }) => {
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: apiKey || '' });
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingGeocoding, setIsLoadingGeocoding] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!isLoaded || !address || !window.google) return;
+    if (!isLoaded || !address || !window.google) {
+      if (!address) {
+        setError('Please provide an address to search.');
+      }
+      return;
+    }
+
+    setIsLoadingGeocoding(true);
+    setError(null); // Clear previous errors when a new geocoding request starts
     const geocoder = new window.google.maps.Geocoder();
+
     geocoder.geocode({ address }, (results, status) => {
+      setIsLoadingGeocoding(false);
       if (status === 'OK' && results && results[0]) {
         setCoords(results[0].geometry.location.toJSON());
-        setError(null);
       } else {
-        setError('Address not found');
+        let errorMessage = 'Error finding address.';
+        switch (status) {
+          case 'ZERO_RESULTS':
+            errorMessage = 'No results found for the given address.';
+            break;
+          case 'OVER_QUERY_LIMIT':
+            errorMessage = 'Daily query limit exceeded. Please try again tomorrow or check your API key.';
+            break;
+          case 'REQUEST_DENIED':
+            errorMessage = 'Request denied. Ensure Geocoding API is enabled and API key is correct.';
+            break;
+          case 'INVALID_REQUEST':
+            errorMessage = 'Invalid request. Please check the address format.';
+            break;
+          default:
+            errorMessage = `Geocoding failed with status: ${status}.`;
+        }
+        setError(errorMessage);
+        setCoords(null); // Clear previous coordinates on error
       }
     });
   }, [isLoaded, address]);
@@ -49,19 +77,25 @@ const MapBackground: React.FC<MapBackgroundProps> = ({ children, address }) => {
               disableDefaultUI: true,
               gestureHandling: 'none',
               draggable: false,
+              mapId: 'DEMO_DARK_MAP_ID', // Ensure dark mode is used
             }}
         >
             <Marker position={coords} />
         </GoogleMap>
       )}
-        {!coords && !error && (
+        {(!coords && !error && isLoaded && isLoadingGeocoding) && (
           <div className="absolute inset-0 flex items-center justify-center z-10 text-white bg-black/40">
-            Loading map…
+            Geocoding address...
           </div>
         )}
         {error && (
           <div className="absolute inset-0 flex items-center justify-center z-10 text-red-400 bg-black/40">
             {error}
+          </div>
+        )}
+        {(!isLoaded && !apiKey) && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 text-gray-400 bg-black/40">
+            Loading Google Maps API...
           </div>
         )}
       </div>
