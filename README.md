@@ -1,5 +1,7 @@
 # Skip Hire - Modern React Implementation
 
+**Live Demo:** [chose-skip.vercel.app](https://chose-skip.vercel.app)
+
 This project is a modern redesign of the skip hire selection page, focusing on user experience, performance, and accessibility while maintaining core functionality.
 
 ## Key Features & Improvements
